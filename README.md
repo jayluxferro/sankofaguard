@@ -44,14 +44,24 @@ character-for-character), so a trained character-level model is required.
 - Zero-width stripping is lossy by design: a legitimate (rare) use of ZWJ, e.g.
   in emoji ZWJ sequences or some orthographies, is removed with the payload.
 
+## Status
+
+Version 0.1.1 — research artifact accompanying a paper under review. The API may
+change before 1.0. The test suite runs on Python 3.10–3.12 via CI. This repository
+contains defensive code only: no encoding/attack tooling and no attack payloads.
+
 ## Install
 
+Python ≥ 3.10. Not on PyPI yet — install from a checkout:
+
 ```bash
-pip install fastapi uvicorn httpx pydantic   # service deps; the core needs none
+pip install -e .                # core normalizer: zero dependencies (stdlib only)
+pip install -e ".[service]"     # + FastAPI/uvicorn/httpx for the HTTP proxy
+pip install -e ".[dev]"         # + pytest
 ```
 
-Or add the package directly. Python ≥ 3.10. The core normalizer
-(`sankofaguard/guard.py`) is dependency-free (stdlib only).
+The core (`sankofaguard/guard.py`) imports nothing outside the standard library,
+so it can be vendored into a pipeline without adding dependencies.
 
 ## Use as a library
 
@@ -91,11 +101,55 @@ are stripped before reaching the target-language model.
 ## Tests
 
 ```bash
-python -m pytest tests/ -q
+pip install -e ".[dev]"
+python -m pytest tests/ -q      # 9 tests, no network, no model needed
 ```
 
 The test suite constructs poisoned inputs inline from Unicode escapes — the
 repository deliberately contains no encoding/attack tooling.
+
+## Scope and safety
+
+This is a defensive normalizer, and the boundary is deliberate:
+
+- It **removes** channels; it does not demonstrate or distribute attacks. No
+  encoder, no payload corpus, no harmful text is included.
+- The homoglyph table is present because it is needed in reverse (restoring Latin
+  characters that were replaced by Cyrillic lookalikes).
+- Zero-width and soft-hyphen handling is **lossy by design**; do not place this in
+  front of general-purpose text processing where emoji ZWJ sequences or soft
+  hyphens are meaningful.
+- It does **not** decode instruction-level encodings (base64/hex/ROT47/unicode-escape).
+  Those payloads are visible ASCII and pass through unchanged.
+
+See [docs/DESIGN.md](docs/DESIGN.md) for the threat model, the order-of-operations
+rationale, and exactly what is and is not guaranteed.
+
+## Repository layout
+
+```
+sankofaguard/guard.py      core normalizer (stdlib only)
+sankofaguard/service.py    FastAPI service: /normalize + OpenAI-compatible proxy
+tests/test_guard.py        unit tests, inline Unicode fixtures
+docs/DESIGN.md             threat model, guarantees, non-goals
+CHANGELOG.md               release history
+```
+
+## Citing
+
+If you use this artifact, please cite the accompanying paper:
+
+```bibtex
+@misc{agyemang2026sankofaguard,
+  title  = {Covert Unicode Channels Bypass LLM Safety Alignment: A Model- and
+            Channel-Dependent Attack Surface with a Language-Independence Control},
+  author = {Agyemang, Justice Owusu and Acheampong, Enoch and Kasore, Vida and
+            Kponyo, Betty Agyei and Kponyo, Jerry John and Owusu Ansah, Elizabeth and
+            Ahene, Emmanuel and Mensah Gyening, Rose-Mary Owusuaa and Frowne, Christian Idan},
+  year   = {2026},
+  note   = {Manuscript under review}
+}
+```
 
 ## Provenance & license
 
